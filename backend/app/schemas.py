@@ -100,6 +100,8 @@ class MeasuredDimension(BaseModel):
 class MeasurementComparisonInput(BaseModel):
     design_name: str = Field(..., min_length=2)
     standard_profile: str = Field(default="India-NBC-IS")
+    drawing_reference: str = Field(..., min_length=3)
+    drawing_type: str = Field(default="PDF/DWG")
     draft_dimensions: List[DimensionSpec]
     measured_dimensions: List[MeasuredDimension]
 
@@ -125,6 +127,7 @@ class DimensionComparisonResult(BaseModel):
 
 class MeasurementComparisonResponse(BaseModel):
     design_name: str
+    drawing_reference: str
     compared_count: int
     pass_count: int
     fail_count: int

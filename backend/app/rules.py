@@ -220,6 +220,19 @@ def compare_draft_vs_measurements(payload: MeasurementComparisonInput) -> Measur
     triggers: List[StandardsTrigger] = []
 
     profile = payload.standard_profile.strip() if payload.standard_profile else "India-NBC-IS"
+    drawing_reference = payload.drawing_reference.strip()
+
+    if not drawing_reference:
+        triggers.append(
+            StandardsTrigger(
+                trigger_id="TRIG-DRAWING-MISSING",
+                severity=Severity.high,
+                title="Drawing reference missing",
+                standard_ref=f"{profile}: drawing traceability requirement",
+                detail="No drawing reference was provided for manual measurements.",
+                recommended_action="Provide drawing number/revision before standards validation.",
+            )
+        )
 
     for draft in payload.draft_dimensions:
         measured: MeasuredDimension | None = measured_map.get(draft.key)
@@ -290,6 +303,7 @@ def compare_draft_vs_measurements(payload: MeasurementComparisonInput) -> Measur
 
     return MeasurementComparisonResponse(
         design_name=payload.design_name,
+        drawing_reference=drawing_reference,
         compared_count=compared_count,
         pass_count=pass_count,
         fail_count=fail_count,

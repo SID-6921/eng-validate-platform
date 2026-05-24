@@ -1,19 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type Severity = "critical" | "high" | "medium" | "low";
-
-type ConstructionReferenceCase = {
-  case_id: string;
-  sector: string;
-  design_name: string;
-  target_status: string;
-  summary: string;
-  key_inputs: Record<string, string | number>;
-  expected_issues: string[];
-  standards: string[];
-};
 
 type DraftRow = {
   key: string;
@@ -21,6 +10,14 @@ type DraftRow = {
   tolerance_plus_mm: number;
   tolerance_minus_mm: number;
   measured_mm: number;
+};
+
+type DraftSample = {
+  id: string;
+  designName: string;
+  standardProfile: string;
+  notes: string;
+  lines: string[];
 };
 
 type ComparisonResult = {
@@ -44,6 +41,7 @@ type StandardsTrigger = {
 
 type MeasurementComparisonResponse = {
   design_name: string;
+  drawing_reference: string;
   compared_count: number;
   pass_count: number;
   fail_count: number;
@@ -54,13 +52,52 @@ type MeasurementComparisonResponse = {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
+const DRAFT_SAMPLES: DraftSample[] = [
+  {
+    id: "sample-airport-concourse",
+    designName: "Airport Concourse Beam Grid - Sample",
+    standardProfile: "India-NBC-IS",
+    notes: "Airport concourse structural elements with one intentional out-of-tolerance measurement.",
+    lines: [
+      "B1-depth,900,4,4,906.5",
+      "B1-width,450,3,3,451.2",
+      "C3-column-size,800,5,5,803.1",
+      "SLAB-T1,180,2,2,177.4",
+    ],
+  },
+  {
+    id: "sample-residential-tower",
+    designName: "G+12 Residential Tower Core - Sample",
+    standardProfile: "India-IS456-RCC",
+    notes: "Core wall and slab checks for RCC building dimensions.",
+    lines: [
+      "CORE-WALL-W,300,3,3,299.8",
+      "STAIR-TREAD,300,2,2,303.4",
+      "STAIR-RISER,150,2,2,149.6",
+      "SLAB-F2,150,2,2,146.9",
+    ],
+  },
+  {
+    id: "sample-steel-warehouse",
+    designName: "Steel Warehouse Frame - Sample",
+    standardProfile: "India-IS800-Steel",
+    notes: "Steel frame and canopy member checks with one major violation.",
+    lines: [
+      "COL-A1,500,4,4,499.2",
+      "RAFTER-R3,650,4,4,656.8",
+      "PURLIN-P7,220,2,2,220.7",
+      "CANOPY-C1,300,3,3,301.1",
+    ],
+  },
+];
+
 export default function HomePage() {
   const [compareLoading, setCompareLoading] = useState(false);
-  const [casesLoading, setCasesLoading] = useState(false);
   const [comparison, setComparison] = useState<MeasurementComparisonResponse | null>(null);
-  const [cases, setCases] = useState<ConstructionReferenceCase[]>([]);
   const [designName, setDesignName] = useState("G+12 Tower Draft - Block A");
   const [standardProfile, setStandardProfile] = useState("India-NBC-IS");
+  const [drawingReference, setDrawingReference] = useState("ARCH-A-101 Rev 02");
+  const [drawingType, setDrawingType] = useState("PDF/DWG");
   const [manualRowsText, setManualRowsText] = useState(
     [
       "B1-depth,900,4,4,906.5",
@@ -70,17 +107,12 @@ export default function HomePage() {
     ].join("\n")
   );
 
-  const loadIndiaConstructionCases = async () => {
-    setCasesLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/india-construction-cases`);
-      const data = (await res.json()) as ConstructionReferenceCase[];
-      setCases(data);
-    } catch {
-      alert("Could not load India construction reference cases.");
-    } finally {
-      setCasesLoading(false);
-    }
+  const loadSampleIntoEditor = (sample: DraftSample) => {
+    setDesignName(sample.designName);
+    setStandardProfile(sample.standardProfile);
+    setDrawingReference(`${sample.designName} / Rev 01`);
+    setManualRowsText(sample.lines.join("\n"));
+    setComparison(null);
   };
 
   const parseManualRows = (raw: string): DraftRow[] => {
@@ -122,6 +154,8 @@ export default function HomePage() {
       const payload = {
         design_name: designName,
         standard_profile: standardProfile,
+        drawing_reference: drawingReference,
+        drawing_type: drawingType,
         draft_dimensions: rows.map((row) => ({
           key: row.key,
           nominal_mm: row.nominal_mm,
@@ -149,9 +183,13 @@ export default function HomePage() {
     }
   };
 
-  useEffect(() => {
-    loadIndiaConstructionCases();
-  }, []);
+  let previewRows: DraftRow[] = [];
+  let previewError = "";
+  try {
+    previewRows = parseManualRows(manualRowsText);
+  } catch (error) {
+    previewError = error instanceof Error ? error.message : "Invalid draft input";
+  }
 
   return (
     <main className="grid" style={{ gap: 20 }}>
@@ -163,14 +201,40 @@ export default function HomePage() {
       </section>
 
       <section className="panel grid" style={{ gap: 12 }}>
+        <h2>Sample Construction Designs</h2>
+        <p className="small">Pick a sample, edit measured values, then run standards check.</p>
+        {DRAFT_SAMPLES.map((sample) => (
+          <article key={sample.id} className="panel" style={{ borderStyle: "dashed" }}>
+            <p><strong>{sample.designName}</strong></p>
+            <p className="small">{sample.notes}</p>
+            <button onClick={() => loadSampleIntoEditor(sample)}>
+              Use This Sample
+            </button>
+          </article>
+        ))}
+      </section>
+
+      <section className="panel grid" style={{ gap: 12 }}>
         <h2>Draft Input and Manual Measurements</h2>
-        <p className="small">Enter each line as: key,nominal_mm,tol_plus_mm,tol_minus_mm,measured_mm</p>
+        <p className="small">1) Add drawing reference, 2) enter manual measurements, 3) run standards check.</p>
         <div className="grid grid-two">
           <input value={designName} onChange={(event) => setDesignName(event.target.value)} placeholder="Draft design name" />
           <select value={standardProfile} onChange={(event) => setStandardProfile(event.target.value)}>
             <option value="India-NBC-IS">India-NBC-IS</option>
             <option value="India-IS456-RCC">India-IS456-RCC</option>
             <option value="India-IS800-Steel">India-IS800-Steel</option>
+          </select>
+        </div>
+        <div className="grid grid-two">
+          <input
+            value={drawingReference}
+            onChange={(event) => setDrawingReference(event.target.value)}
+            placeholder="Drawing ref (example: ARCH-A-101 Rev 02)"
+          />
+          <select value={drawingType} onChange={(event) => setDrawingType(event.target.value)}>
+            <option value="PDF/DWG">PDF/DWG</option>
+            <option value="BIM/IFC">BIM/IFC</option>
+            <option value="Image/Scan">Image/Scan</option>
           </select>
         </div>
         <textarea
@@ -184,11 +248,44 @@ export default function HomePage() {
         </button>
       </section>
 
+      <section className="panel grid" style={{ gap: 12 }}>
+        <h2>Architect Draft View</h2>
+        <p className="small">Preview of what a designer/architect typically reviews before issuing for check.</p>
+        {previewError ? (
+          <p className="small" style={{ color: "#b42318" }}>
+            {previewError}
+          </p>
+        ) : (
+          <div className="grid grid-two">
+            <article className="draft-sheet">
+              <p className="small"><strong>Design:</strong> {designName}</p>
+              <p className="small"><strong>Profile:</strong> {standardProfile}</p>
+              {previewRows.slice(0, 6).map((row) => (
+                <div key={row.key} className="draft-line">
+                  <strong>{row.key}</strong>
+                  <span>{row.nominal_mm} mm</span>
+                  <span>+/- {Math.max(row.tolerance_plus_mm, row.tolerance_minus_mm)} mm</span>
+                </div>
+              ))}
+            </article>
+
+            <article className="panel" style={{ borderStyle: "dashed" }}>
+              <h3>Measurement Sheet</h3>
+              {previewRows.map((row) => (
+                <p key={`${row.key}-m`} className="small">
+                  {row.key}: design {row.nominal_mm} mm, measured {row.measured_mm} mm
+                </p>
+              ))}
+            </article>
+          </div>
+        )}
+      </section>
+
       {comparison && (
         <section className="panel grid" style={{ gap: 10 }}>
           <h2>Comparison Outcome</h2>
           <p className="small">
-            Design: {comparison.design_name} | Status: <strong>{comparison.overall_status}</strong> | Pass: {comparison.pass_count} | Fail: {comparison.fail_count}
+            Design: {comparison.design_name} | Drawing: {comparison.drawing_reference} | Status: <strong>{comparison.overall_status}</strong> | Pass: {comparison.pass_count} | Fail: {comparison.fail_count}
           </p>
 
           {comparison.standards_triggers.length > 0 && (
@@ -221,25 +318,6 @@ export default function HomePage() {
         </section>
       )}
 
-      <section className="panel grid" style={{ gap: 8 }}>
-        <h2>Construction Draft References</h2>
-        <p className="small">Use these as baseline draft cases for manual input and standards checking.</p>
-        <button onClick={loadIndiaConstructionCases} disabled={casesLoading}>
-          {casesLoading ? "Loading..." : "Load Construction Cases"}
-        </button>
-        {cases.map((item) => (
-          <article key={item.case_id} className="panel" style={{ borderStyle: "dashed" }}>
-            <p>
-              <strong>{item.case_id}</strong> - {item.design_name}
-            </p>
-            <p className="small">Sector: {item.sector}</p>
-            <p className="small">Target status: {item.target_status}</p>
-            <p className="small">{item.summary}</p>
-            <p className="small"><strong>Expected issues:</strong> {item.expected_issues.length ? item.expected_issues.join("; ") : "None"}</p>
-            <p className="small"><strong>Standards:</strong> {item.standards.join(", ")}</p>
-          </article>
-        ))}
-      </section>
     </main>
   );
 }
