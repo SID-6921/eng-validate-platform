@@ -39,6 +39,17 @@ type DesignSource = {
   notes: string;
 };
 
+type ConstructionReferenceCase = {
+  case_id: string;
+  sector: string;
+  design_name: string;
+  target_status: string;
+  summary: string;
+  key_inputs: Record<string, string | number>;
+  expected_issues: string[];
+  standards: string[];
+};
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 export default function HomePage() {
@@ -46,8 +57,10 @@ export default function HomePage() {
   const [result, setResult] = useState<ResponsePayload | null>(null);
   const [processLoading, setProcessLoading] = useState(false);
   const [sourcesLoading, setSourcesLoading] = useState(false);
+  const [casesLoading, setCasesLoading] = useState(false);
   const [processResult, setProcessResult] = useState<ProcessSuggestionResponse | null>(null);
   const [sources, setSources] = useState<DesignSource[]>([]);
+  const [cases, setCases] = useState<ConstructionReferenceCase[]>([]);
 
   const [form, setForm] = useState({
     design_name: "Motor Mount Plate",
@@ -123,6 +136,19 @@ export default function HomePage() {
       alert("Could not load online design sources.");
     } finally {
       setSourcesLoading(false);
+    }
+  };
+
+  const loadIndiaConstructionCases = async () => {
+    setCasesLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/india-construction-cases`);
+      const data = (await res.json()) as ConstructionReferenceCase[];
+      setCases(data);
+    } catch {
+      alert("Could not load India construction reference cases.");
+    } finally {
+      setCasesLoading(false);
     }
   };
 
@@ -231,6 +257,26 @@ export default function HomePage() {
             <p><strong>{source.name}</strong> ({source.category})</p>
             <p className="small">{source.notes}</p>
             <a href={source.url} target="_blank" rel="noreferrer">{source.url}</a>
+          </article>
+        ))}
+      </section>
+
+      <section className="panel grid" style={{ gap: 8 }}>
+        <h2>India Construction Reference Cases</h2>
+        <p className="small">Ready-to-test cases for airport, customs cargo, and high-rise checks.</p>
+        <button onClick={loadIndiaConstructionCases} disabled={casesLoading}>
+          {casesLoading ? "Loading..." : "Load India Construction Cases"}
+        </button>
+        {cases.map((item) => (
+          <article key={item.case_id} className="panel" style={{ borderStyle: "dashed" }}>
+            <p>
+              <strong>{item.case_id}</strong> - {item.design_name}
+            </p>
+            <p className="small">Sector: {item.sector}</p>
+            <p className="small">Target status: {item.target_status}</p>
+            <p className="small">{item.summary}</p>
+            <p className="small"><strong>Expected issues:</strong> {item.expected_issues.length ? item.expected_issues.join("; ") : "None"}</p>
+            <p className="small"><strong>Standards:</strong> {item.standards.join(", ")}</p>
           </article>
         ))}
       </section>

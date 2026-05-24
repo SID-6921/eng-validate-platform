@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .reference_data import get_india_construction_reference_cases
 from .rules import (
     compute_readiness_score,
     get_online_design_sources,
@@ -8,6 +9,7 @@ from .rules import (
     suggest_manufacturing_process,
 )
 from .schemas import (
+    ConstructionReferenceCase,
     DesignSource,
     DesignValidationInput,
     DesignValidationResponse,
@@ -58,6 +60,11 @@ def design_sources() -> list[DesignSource]:
 @app.post("/api/v1/suggest-process", response_model=ProcessSuggestionResponse)
 def suggest_process(payload: ProcessSuggestionInput) -> ProcessSuggestionResponse:
     return suggest_manufacturing_process(payload)
+
+
+@app.get("/api/v1/india-construction-cases", response_model=list[ConstructionReferenceCase])
+def india_construction_cases() -> list[ConstructionReferenceCase]:
+    return get_india_construction_reference_cases()
 
 
 @app.post("/api/v1/validate-design", response_model=DesignValidationResponse)

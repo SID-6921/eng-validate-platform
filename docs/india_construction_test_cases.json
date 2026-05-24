@@ -1,0 +1,42 @@
+[
+  {
+    "case_id": "AP-TRUSS-01",
+    "sector": "airport-terminal",
+    "design_name": "Check-in Hall Steel Truss",
+    "target_status": "conditional-approval",
+    "summary": "Long-span roof truss with pending connection and vibration checks.",
+    "standards": ["IS 800", "IS 875", "IS 1893", "NBC 2016"]
+  },
+  {
+    "case_id": "CU-SLAB-03",
+    "sector": "customs-cargo",
+    "design_name": "Forklift Bay RC Slab",
+    "target_status": "rework-required",
+    "summary": "Warehouse slab with axle and rack point-load overstress risk.",
+    "standards": ["IS 456", "IS 875", "NBC 2016", "Warehouse SOP"]
+  },
+  {
+    "case_id": "HR-CORE-04",
+    "sector": "high-rise",
+    "design_name": "RC Core + Egress Stair",
+    "target_status": "approved",
+    "summary": "Compliant stair core geometry and seismic detailing baseline.",
+    "standards": ["NBC 2016", "IS 456", "IS 1893", "IS 13920"]
+  },
+  {
+    "case_id": "AP-FIRE-06",
+    "sector": "airport-terminal",
+    "design_name": "Fire Stair Pressurization Shaft",
+    "target_status": "rework-required",
+    "summary": "Pressurization design with redundancy and smoke-control gaps.",
+    "standards": ["NBC 2016 Fire", "Local Fire NOC norms", "Airport EHS SOP"]
+  },
+  {
+    "case_id": "CU-CANOPY-07",
+    "sector": "customs-cargo",
+    "design_name": "Truck Inspection Canopy",
+    "target_status": "conditional-approval",
+    "summary": "Inspection lane canopy mostly compliant with minor documentation gap.",
+    "standards": ["IS 800", "IS 875", "NBC 2016", "Customs lane SOP"]
+  }
+]

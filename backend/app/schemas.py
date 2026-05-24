@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -72,3 +72,14 @@ class DesignSource(BaseModel):
     url: str
     category: str
     notes: str
+
+
+class ConstructionReferenceCase(BaseModel):
+    case_id: str
+    sector: str
+    design_name: str
+    target_status: str
+    summary: str
+    key_inputs: Dict[str, str | int | float]
+    expected_issues: List[str]
+    standards: List[str]
