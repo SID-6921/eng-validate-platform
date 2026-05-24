@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Severity = "critical" | "high" | "medium" | "low";
 
@@ -152,6 +152,10 @@ export default function HomePage() {
     }
   };
 
+  useEffect(() => {
+    loadIndiaConstructionCases();
+  }, []);
+
   return (
     <main className="grid" style={{ gap: 20 }}>
       <section className="panel grid" style={{ gap: 8 }}>
@@ -263,7 +267,7 @@ export default function HomePage() {
 
       <section className="panel grid" style={{ gap: 8 }}>
         <h2>India Construction Reference Cases</h2>
-        <p className="small">Ready-to-test cases for airport, customs cargo, and high-rise checks.</p>
+        <p className="small">Preloaded construction-only demo cases for airport, buildings, bridges, metro, warehouse, and utilities.</p>
         <button onClick={loadIndiaConstructionCases} disabled={casesLoading}>
           {casesLoading ? "Loading..." : "Load India Construction Cases"}
         </button>
