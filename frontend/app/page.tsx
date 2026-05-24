@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { ChangeEvent } from "react";
 
 type Severity = "critical" | "high" | "medium" | "low";
 
@@ -98,6 +99,8 @@ export default function HomePage() {
   const [standardProfile, setStandardProfile] = useState("India-NBC-IS");
   const [drawingReference, setDrawingReference] = useState("ARCH-A-101 Rev 02");
   const [drawingType, setDrawingType] = useState("PDF/DWG");
+  const [drawingPreviewSrc, setDrawingPreviewSrc] = useState<string>("");
+  const [drawingPreviewName, setDrawingPreviewName] = useState<string>("");
   const [manualRowsText, setManualRowsText] = useState(
     [
       "B1-depth,900,4,4,906.5",
@@ -113,6 +116,26 @@ export default function HomePage() {
     setDrawingReference(`${sample.designName} / Rev 01`);
     setManualRowsText(sample.lines.join("\n"));
     setComparison(null);
+  };
+
+  const onDrawingImageSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file (PNG/JPG/WebP).\nFor PDF/DWG, enter drawing reference and type.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDrawingPreviewSrc(String(reader.result || ""));
+      setDrawingPreviewName(file.name);
+      setDrawingType("Image/Scan");
+    };
+    reader.readAsDataURL(file);
   };
 
   const parseManualRows = (raw: string): DraftRow[] => {
@@ -237,6 +260,10 @@ export default function HomePage() {
             <option value="Image/Scan">Image/Scan</option>
           </select>
         </div>
+        <div className="grid">
+          <input type="file" accept="image/*" onChange={onDrawingImageSelected} />
+          <p className="small">Optional: upload a drawing image so it appears in the architect view.</p>
+        </div>
         <textarea
           value={manualRowsText}
           onChange={(event) => setManualRowsText(event.target.value)}
@@ -256,7 +283,16 @@ export default function HomePage() {
             {previewError}
           </p>
         ) : (
-          <div className="grid grid-two">
+          <div className="grid">
+            {drawingPreviewSrc && (
+              <article className="panel" style={{ borderStyle: "dashed" }}>
+                <h3>Drawing Preview</h3>
+                <p className="small">{drawingPreviewName}</p>
+                <img src={drawingPreviewSrc} alt="Uploaded drawing preview" style={{ width: "100%", borderRadius: 10, border: "1px solid #d8dee6" }} />
+              </article>
+            )}
+
+            <div className="grid grid-two">
             <article className="draft-sheet">
               <p className="small"><strong>Design:</strong> {designName}</p>
               <p className="small"><strong>Profile:</strong> {standardProfile}</p>
@@ -277,6 +313,7 @@ export default function HomePage() {
                 </p>
               ))}
             </article>
+            </div>
           </div>
         )}
       </section>
