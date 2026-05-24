@@ -219,6 +219,8 @@ def compare_draft_vs_measurements(payload: MeasurementComparisonInput) -> Measur
     results: List[DimensionComparisonResult] = []
     triggers: List[StandardsTrigger] = []
 
+    profile = payload.standard_profile.strip() if payload.standard_profile else "India-NBC-IS"
+
     for draft in payload.draft_dimensions:
         measured: MeasuredDimension | None = measured_map.get(draft.key)
         if measured is None:
@@ -227,7 +229,7 @@ def compare_draft_vs_measurements(payload: MeasurementComparisonInput) -> Measur
                     trigger_id=f"TRIG-MISS-{draft.key}",
                     severity=Severity.high,
                     title="Measured dimension missing",
-                    standard_ref="NBC 2016 documentation completeness + IS 1200 measurement practice",
+                    standard_ref=f"{profile}: NBC 2016 documentation completeness + IS 1200 measurement practice",
                     detail=f"Dimension '{draft.key}' is in draft design but missing in measured set.",
                     recommended_action="Capture missing field measurement and rerun comparison.",
                 )
@@ -253,12 +255,12 @@ def compare_draft_vs_measurements(payload: MeasurementComparisonInput) -> Measur
 
         if not pass_check:
             severity = Severity.critical if abs(deviation) > 2.0 else Severity.high
-            standard_ref = "NBC 2016 + Project QA tolerance control"
+            standard_ref = f"{profile}: NBC 2016 + Project QA tolerance control"
             key_lower = draft.key.lower()
             if any(token in key_lower for token in ["slab", "beam", "column", "wall", "footing"]):
-                standard_ref = "IS 456 dimensional control + NBC 2016"
+                standard_ref = f"{profile}: IS 456 dimensional control + NBC 2016"
             elif any(token in key_lower for token in ["truss", "steel", "canopy", "frame"]):
-                standard_ref = "IS 800 fabrication tolerance + NBC 2016"
+                standard_ref = f"{profile}: IS 800 fabrication tolerance + NBC 2016"
 
             triggers.append(
                 StandardsTrigger(
