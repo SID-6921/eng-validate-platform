@@ -51,7 +51,66 @@ type MeasurementComparisonResponse = {
   standards_triggers: StandardsTrigger[];
 };
 
+type StandardProfile = {
+  value: string;
+  label: string;
+  focus: string;
+};
+
+type PublicDesignReference = {
+  id: string;
+  title: string;
+  source: string;
+  url: string;
+  sampleLines: string[];
+};
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+const STANDARD_PROFILES: StandardProfile[] = [
+  { value: "India-NBC-IS", label: "India-NBC-IS", focus: "General building controls and compliance baseline" },
+  { value: "India-IS456-RCC", label: "IS 456 (RCC)", focus: "Concrete structural dimensions and tolerances" },
+  { value: "India-IS800-Steel", label: "IS 800 (Steel)", focus: "Steel member and fabrication tolerance checks" },
+  { value: "India-IS875-Loads", label: "IS 875 (Loads)", focus: "Dead/live/wind load reference family" },
+  { value: "India-IS1893-Seismic", label: "IS 1893 (Seismic)", focus: "Seismic design basis and response checks" },
+  { value: "India-IS1200-Measurement", label: "IS 1200 (Measurement)", focus: "Measurement method and BOQ quantity basis" },
+];
+
+const PUBLIC_DESIGN_REFERENCES: PublicDesignReference[] = [
+  {
+    id: "pub-airport-terminal",
+    title: "Airport Terminal Structural Concept",
+    source: "GrabCAD",
+    url: "https://grabcad.com/library",
+    sampleLines: [
+      "CONC-BEAM-01,900,4,4,902.5",
+      "CONC-COL-03,750,5,5,746.8",
+      "SLAB-Z2,180,2,2,177.9",
+    ],
+  },
+  {
+    id: "pub-steel-canopy",
+    title: "Steel Canopy / Frame Components",
+    source: "TraceParts",
+    url: "https://www.traceparts.com/en",
+    sampleLines: [
+      "CANOPY-MAIN,300,3,3,301.1",
+      "FRAME-C1,500,4,4,496.9",
+      "TRUSS-NODE,220,2,2,224.6",
+    ],
+  },
+  {
+    id: "pub-building-components",
+    title: "Building Components CAD Baselines",
+    source: "3D ContentCentral",
+    url: "https://www.3dcontentcentral.com",
+    sampleLines: [
+      "STAIR-TREAD,300,2,2,302.4",
+      "STAIR-RISER,150,2,2,151.6",
+      "CORE-WALL-W,300,3,3,297.2",
+    ],
+  },
+];
 
 const DRAFT_SAMPLES: DraftSample[] = [
   {
@@ -97,6 +156,7 @@ export default function HomePage() {
   const [comparison, setComparison] = useState<MeasurementComparisonResponse | null>(null);
   const [designName, setDesignName] = useState("G+12 Tower Draft - Block A");
   const [standardProfile, setStandardProfile] = useState("India-NBC-IS");
+  const [standardsLine, setStandardsLine] = useState("IS 456, IS 875, IS 1893, IS 1200, NBC 2016");
   const [drawingReference, setDrawingReference] = useState("ARCH-A-101 Rev 02");
   const [drawingType, setDrawingType] = useState("PDF/DWG");
   const [drawingPreviewSrc, setDrawingPreviewSrc] = useState<string>("");
@@ -113,8 +173,16 @@ export default function HomePage() {
   const loadSampleIntoEditor = (sample: DraftSample) => {
     setDesignName(sample.designName);
     setStandardProfile(sample.standardProfile);
+    setStandardsLine("IS 456, IS 875, IS 1893, IS 1200, NBC 2016");
     setDrawingReference(`${sample.designName} / Rev 01`);
     setManualRowsText(sample.lines.join("\n"));
+    setComparison(null);
+  };
+
+  const loadPublicReferenceIntoEditor = (reference: PublicDesignReference) => {
+    setDesignName(`${reference.title} - Quick Draft`);
+    setDrawingReference(`${reference.source} reference`);
+    setManualRowsText(reference.sampleLines.join("\n"));
     setComparison(null);
   };
 
@@ -176,7 +244,7 @@ export default function HomePage() {
       const rows = parseManualRows(manualRowsText);
       const payload = {
         design_name: designName,
-        standard_profile: standardProfile,
+        standard_profile: standardsLine.trim() || standardProfile,
         drawing_reference: drawingReference,
         drawing_type: drawingType,
         draft_dimensions: rows.map((row) => ({
@@ -208,6 +276,7 @@ export default function HomePage() {
 
   let previewRows: DraftRow[] = [];
   let previewError = "";
+  const selectedProfile = STANDARD_PROFILES.find((profile) => profile.value === standardProfile);
   try {
     previewRows = parseManualRows(manualRowsText);
   } catch (error) {
@@ -221,6 +290,44 @@ export default function HomePage() {
         <p className="small">
           Load a construction draft, enter manual field dimensions, and check against IS/NBC-based tolerance and compliance triggers.
         </p>
+      </section>
+
+      <section className="panel grid" style={{ gap: 10 }}>
+        <h2>Standards Lobby</h2>
+        <p className="small">Select a standard family or type multiple standards in one line.</p>
+        <div className="grid grid-two">
+          {STANDARD_PROFILES.map((profile) => (
+            <article key={profile.value} className="panel" style={{ borderStyle: profile.value === standardProfile ? "solid" : "dashed", borderColor: profile.value === standardProfile ? "#004a77" : "#d8dee6" }}>
+              <p><strong>{profile.label}</strong></p>
+              <p className="small">{profile.focus}</p>
+              <button onClick={() => setStandardProfile(profile.value)}>
+                Use This Standard
+              </button>
+            </article>
+          ))}
+        </div>
+        <input
+          value={standardsLine}
+          onChange={(event) => setStandardsLine(event.target.value)}
+          placeholder="Example: IS 456, IS 875, IS 1893, IS 1200, NBC 2016"
+        />
+      </section>
+
+      <section className="panel grid" style={{ gap: 10 }}>
+        <h2>Public Design References</h2>
+        <p className="small">No files needed: use public references below, then enter your measurements and run checks.</p>
+        <div className="grid grid-two">
+          {PUBLIC_DESIGN_REFERENCES.map((reference) => (
+            <article key={reference.id} className="panel" style={{ borderStyle: "dashed" }}>
+              <p><strong>{reference.title}</strong></p>
+              <p className="small">Source: {reference.source}</p>
+              <a href={reference.url} target="_blank" rel="noreferrer">{reference.url}</a>
+              <button onClick={() => loadPublicReferenceIntoEditor(reference)}>
+                Load Quick Draft
+              </button>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="panel grid" style={{ gap: 12 }}>
@@ -243,11 +350,14 @@ export default function HomePage() {
         <div className="grid grid-two">
           <input value={designName} onChange={(event) => setDesignName(event.target.value)} placeholder="Draft design name" />
           <select value={standardProfile} onChange={(event) => setStandardProfile(event.target.value)}>
-            <option value="India-NBC-IS">India-NBC-IS</option>
-            <option value="India-IS456-RCC">India-IS456-RCC</option>
-            <option value="India-IS800-Steel">India-IS800-Steel</option>
+            {STANDARD_PROFILES.map((profile) => (
+              <option key={profile.value} value={profile.value}>{profile.label}</option>
+            ))}
           </select>
         </div>
+        {selectedProfile && (
+          <p className="small"><strong>Selected standard focus:</strong> {selectedProfile.focus}</p>
+        )}
         <div className="grid grid-two">
           <input
             value={drawingReference}
