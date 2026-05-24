@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .reference_data import get_india_construction_reference_cases
 from .rules import (
+    compare_draft_vs_measurements,
     compute_readiness_score,
     get_online_design_sources,
     run_validation,
@@ -11,6 +12,8 @@ from .rules import (
 from .schemas import (
     ConstructionReferenceCase,
     DesignSource,
+    MeasurementComparisonInput,
+    MeasurementComparisonResponse,
     DesignValidationInput,
     DesignValidationResponse,
     ProcessSuggestionInput,
@@ -65,6 +68,11 @@ def suggest_process(payload: ProcessSuggestionInput) -> ProcessSuggestionRespons
 @app.get("/api/v1/india-construction-cases", response_model=list[ConstructionReferenceCase])
 def india_construction_cases() -> list[ConstructionReferenceCase]:
     return get_india_construction_reference_cases()
+
+
+@app.post("/api/v1/compare-measurements", response_model=MeasurementComparisonResponse)
+def compare_measurements(payload: MeasurementComparisonInput) -> MeasurementComparisonResponse:
+    return compare_draft_vs_measurements(payload)
 
 
 @app.post("/api/v1/validate-design", response_model=DesignValidationResponse)

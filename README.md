@@ -47,6 +47,7 @@ npm run dev
 - `GET /api/v1/standards`
 - `GET /api/v1/design-sources`
 - `POST /api/v1/suggest-process`
+- `POST /api/v1/compare-measurements`
 
 ## Next build milestones
 

@@ -1,11 +1,16 @@
 from typing import List
 
 from .schemas import (
+    DimensionComparisonResult,
     DesignSource,
     DesignValidationInput,
+    MeasurementComparisonInput,
+    MeasurementComparisonResponse,
+    MeasuredDimension,
     ProcessSuggestionInput,
     ProcessSuggestionResponse,
     Severity,
+    StandardsTrigger,
     ValidationFinding,
 )
 
@@ -207,3 +212,79 @@ def get_online_design_sources() -> List[DesignSource]:
             notes="Official standards catalog and metadata (full texts may require purchase/access).",
         ),
     ]
+
+
+def compare_draft_vs_measurements(payload: MeasurementComparisonInput) -> MeasurementComparisonResponse:
+    measured_map = {item.key: item for item in payload.measured_dimensions}
+    results: List[DimensionComparisonResult] = []
+    triggers: List[StandardsTrigger] = []
+
+    for draft in payload.draft_dimensions:
+        measured: MeasuredDimension | None = measured_map.get(draft.key)
+        if measured is None:
+            triggers.append(
+                StandardsTrigger(
+                    trigger_id=f"TRIG-MISS-{draft.key}",
+                    severity=Severity.high,
+                    title="Measured dimension missing",
+                    standard_ref="IS/Project QA measurement completeness",
+                    detail=f"Dimension '{draft.key}' is in draft design but missing in measured set.",
+                    recommended_action="Capture missing field measurement and rerun comparison.",
+                )
+            )
+            continue
+
+        min_allowed = draft.nominal_mm - draft.tolerance_minus_mm
+        max_allowed = draft.nominal_mm + draft.tolerance_plus_mm
+        deviation = round(measured.value_mm - draft.nominal_mm, 4)
+        pass_check = min_allowed <= measured.value_mm <= max_allowed
+
+        results.append(
+            DimensionComparisonResult(
+                key=draft.key,
+                nominal_mm=draft.nominal_mm,
+                measured_mm=measured.value_mm,
+                deviation_mm=deviation,
+                min_allowed_mm=round(min_allowed, 4),
+                max_allowed_mm=round(max_allowed, 4),
+                pass_check=pass_check,
+            )
+        )
+
+        if not pass_check:
+            severity = Severity.critical if abs(deviation) > 2.0 else Severity.high
+            triggers.append(
+                StandardsTrigger(
+                    trigger_id=f"TRIG-TOL-{draft.key}",
+                    severity=severity,
+                    title="Tolerance violation",
+                    standard_ref="ISO 2768 / IS manufacturing tolerance control",
+                    detail=(
+                        f"'{draft.key}' measured at {measured.value_mm} mm is outside "
+                        f"allowed range [{round(min_allowed, 3)}, {round(max_allowed, 3)}] mm."
+                    ),
+                    recommended_action="Adjust fabrication process or revise design tolerance with engineering approval.",
+                )
+            )
+
+    pass_count = len([item for item in results if item.pass_check])
+    fail_count = len([item for item in results if not item.pass_check]) + len(
+        [item for item in triggers if item.trigger_id.startswith("TRIG-MISS-")]
+    )
+    compared_count = len(payload.draft_dimensions)
+
+    overall_status = "approved"
+    if any(item.severity == Severity.critical for item in triggers):
+        overall_status = "rework-required"
+    elif fail_count > 0:
+        overall_status = "conditional-approval"
+
+    return MeasurementComparisonResponse(
+        design_name=payload.design_name,
+        compared_count=compared_count,
+        pass_count=pass_count,
+        fail_count=fail_count,
+        overall_status=overall_status,
+        results=results,
+        standards_triggers=triggers,
+    )

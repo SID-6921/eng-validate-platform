@@ -23,15 +23,6 @@ type ResponsePayload = {
   recommendations: string[];
 };
 
-type ProcessSuggestionResponse = {
-  design_name: string;
-  recommended_process: string;
-  reasoning: string[];
-  suggested_tolerance_band_mm: string;
-  standards_to_check: string[];
-  production_risks: string[];
-};
-
 type DesignSource = {
   name: string;
   url: string;
@@ -50,29 +41,46 @@ type ConstructionReferenceCase = {
   standards: string[];
 };
 
+type ComparisonResult = {
+  key: string;
+  nominal_mm: number;
+  measured_mm: number;
+  deviation_mm: number;
+  min_allowed_mm: number;
+  max_allowed_mm: number;
+  pass_check: boolean;
+};
+
+type StandardsTrigger = {
+  trigger_id: string;
+  severity: Severity;
+  title: string;
+  standard_ref: string;
+  detail: string;
+  recommended_action: string;
+};
+
+type MeasurementComparisonResponse = {
+  design_name: string;
+  compared_count: number;
+  pass_count: number;
+  fail_count: number;
+  overall_status: string;
+  results: ComparisonResult[];
+  standards_triggers: StandardsTrigger[];
+};
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ResponsePayload | null>(null);
-  const [processLoading, setProcessLoading] = useState(false);
+  const [compareLoading, setCompareLoading] = useState(false);
   const [sourcesLoading, setSourcesLoading] = useState(false);
   const [casesLoading, setCasesLoading] = useState(false);
-  const [processResult, setProcessResult] = useState<ProcessSuggestionResponse | null>(null);
+  const [comparison, setComparison] = useState<MeasurementComparisonResponse | null>(null);
   const [sources, setSources] = useState<DesignSource[]>([]);
   const [cases, setCases] = useState<ConstructionReferenceCase[]>([]);
-
-  const [form, setForm] = useState({
-    design_name: "Motor Mount Plate",
-    process_family: "metal",
-    part_length_mm: 220,
-    part_width_mm: 130,
-    part_height_mm: 18,
-    min_feature_mm: 1.2,
-    tolerance_mm: 0.05,
-    annual_volume: 3200,
-    material: "AL-6061",
-  });
 
   const runValidation = async () => {
     setLoading(true);
@@ -107,25 +115,6 @@ export default function HomePage() {
     }
   };
 
-  const runProcessSuggestion = async () => {
-    setProcessLoading(true);
-    setProcessResult(null);
-
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/suggest-process`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = (await res.json()) as ProcessSuggestionResponse;
-      setProcessResult(data);
-    } catch {
-      alert("Could not connect to process suggestion API.");
-    } finally {
-      setProcessLoading(false);
-    }
-  };
-
   const loadDesignSources = async () => {
     setSourcesLoading(true);
     try {
@@ -152,6 +141,41 @@ export default function HomePage() {
     }
   };
 
+  const runDraftComparison = async () => {
+    setCompareLoading(true);
+    setComparison(null);
+
+    const payload = {
+      design_name: "Airport Concourse Beam Grid Draft-A",
+      standard_profile: "India-NBC-IS",
+      draft_dimensions: [
+        { key: "B1-depth", nominal_mm: 900, tolerance_plus_mm: 4, tolerance_minus_mm: 4 },
+        { key: "B1-width", nominal_mm: 450, tolerance_plus_mm: 3, tolerance_minus_mm: 3 },
+        { key: "C3-column-size", nominal_mm: 800, tolerance_plus_mm: 5, tolerance_minus_mm: 5 },
+        { key: "SLAB-T1", nominal_mm: 180, tolerance_plus_mm: 2, tolerance_minus_mm: 2 },
+      ],
+      measured_dimensions: [
+        { key: "B1-depth", value_mm: 906.5 },
+        { key: "B1-width", value_mm: 451.2 },
+        { key: "C3-column-size", value_mm: 793.8 },
+      ],
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/compare-measurements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = (await res.json()) as MeasurementComparisonResponse;
+      setComparison(data);
+    } catch {
+      alert("Could not run draft vs measured comparison.");
+    } finally {
+      setCompareLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadIndiaConstructionCases();
   }, []);
@@ -172,6 +196,51 @@ export default function HomePage() {
           {loading ? "Analyzing..." : "Analyze Design"}
         </button>
       </section>
+
+      <section className="panel grid" style={{ gap: 12 }}>
+        <h2>Draft Design vs Measured Comparison</h2>
+        <p className="small">Runs full measurement comparison and pops up standards triggers when tolerance or completeness fails.</p>
+        <button onClick={runDraftComparison} disabled={compareLoading}>
+          {compareLoading ? "Comparing..." : "Compare Draft vs Measured"}
+        </button>
+      </section>
+
+      {comparison && (
+        <section className="panel grid" style={{ gap: 10 }}>
+          <h2>Comparison Outcome</h2>
+          <p className="small">
+            Design: {comparison.design_name} | Status: <strong>{comparison.overall_status}</strong> | Pass: {comparison.pass_count} | Fail: {comparison.fail_count}
+          </p>
+
+          {comparison.standards_triggers.length > 0 && (
+            <>
+              <h3>Standards Triggers (Pop-up Alerts)</h3>
+              {comparison.standards_triggers.map((trigger) => (
+                <article key={trigger.trigger_id} className="panel" style={{ border: "1px solid #f7b4b4", background: "#fff5f5" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                    <strong>{trigger.title}</strong>
+                    <span className={`badge ${trigger.severity}`}>{trigger.severity}</span>
+                  </div>
+                  <p className="small"><strong>Standard:</strong> {trigger.standard_ref}</p>
+                  <p className="small">{trigger.detail}</p>
+                  <p className="small"><strong>Action:</strong> {trigger.recommended_action}</p>
+                </article>
+              ))}
+            </>
+          )}
+
+          <h3>Dimension-by-Dimension Check</h3>
+          {comparison.results.map((row) => (
+            <article key={row.key} className="panel" style={{ borderStyle: "dashed" }}>
+              <p>
+                <strong>{row.key}</strong> | nominal {row.nominal_mm} mm | measured {row.measured_mm} mm | deviation {row.deviation_mm} mm
+              </p>
+              <p className="small">Allowed range: {row.min_allowed_mm} to {row.max_allowed_mm} mm</p>
+              <p className="small">Result: {row.pass_check ? "PASS" : "FAIL"}</p>
+            </article>
+          ))}
+        </section>
+      )}
 
       {result && (
         <>
@@ -210,45 +279,6 @@ export default function HomePage() {
             ))}
           </section>
         </>
-      )}
-
-      <section className="panel grid" style={{ gap: 12 }}>
-        <h2>Manufacturing Process Suggestion From Measurements</h2>
-        <p className="small">Enter core dimensions and tolerance to get a standards-aware process recommendation.</p>
-        <div className="grid grid-two">
-          <input value={form.design_name} onChange={(e) => setForm({ ...form, design_name: e.target.value })} placeholder="Design name" />
-          <input value={form.process_family} onChange={(e) => setForm({ ...form, process_family: e.target.value })} placeholder="Process family" />
-          <input type="number" value={form.part_length_mm} onChange={(e) => setForm({ ...form, part_length_mm: Number(e.target.value) })} placeholder="Length (mm)" />
-          <input type="number" value={form.part_width_mm} onChange={(e) => setForm({ ...form, part_width_mm: Number(e.target.value) })} placeholder="Width (mm)" />
-          <input type="number" value={form.part_height_mm} onChange={(e) => setForm({ ...form, part_height_mm: Number(e.target.value) })} placeholder="Height (mm)" />
-          <input type="number" value={form.min_feature_mm} onChange={(e) => setForm({ ...form, min_feature_mm: Number(e.target.value) })} placeholder="Min feature (mm)" />
-          <input type="number" value={form.tolerance_mm} onChange={(e) => setForm({ ...form, tolerance_mm: Number(e.target.value) })} placeholder="Tolerance (mm)" />
-          <input type="number" value={form.annual_volume} onChange={(e) => setForm({ ...form, annual_volume: Number(e.target.value) })} placeholder="Annual volume" />
-          <input value={form.material} onChange={(e) => setForm({ ...form, material: e.target.value })} placeholder="Material" />
-        </div>
-        <button onClick={runProcessSuggestion} disabled={processLoading}>
-          {processLoading ? "Evaluating..." : "Suggest Manufacturing Process"}
-        </button>
-      </section>
-
-      {processResult && (
-        <section className="panel grid" style={{ gap: 8 }}>
-          <h2>Process Recommendation</h2>
-          <p><strong>Recommended process:</strong> {processResult.recommended_process}</p>
-          <p className="small"><strong>Suggested tolerance band:</strong> {processResult.suggested_tolerance_band_mm}</p>
-          <h3>Reasoning</h3>
-          {processResult.reasoning.map((item) => (
-            <p key={item} className="small">- {item}</p>
-          ))}
-          <h3>Standards To Check</h3>
-          {processResult.standards_to_check.map((item) => (
-            <p key={item} className="small">- {item}</p>
-          ))}
-          <h3>Production Risks</h3>
-          {processResult.production_risks.map((item) => (
-            <p key={item} className="small">- {item}</p>
-          ))}
-        </section>
       )}
 
       <section className="panel grid" style={{ gap: 8 }}>
