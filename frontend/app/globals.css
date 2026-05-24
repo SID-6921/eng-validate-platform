@@ -48,12 +48,17 @@ h1, h2, h3 {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
-input, button {
+input, select, textarea, button {
   width: 100%;
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid var(--line);
   font-size: 14px;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 140px;
 }
 
 button {

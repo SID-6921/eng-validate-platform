@@ -227,7 +227,7 @@ def compare_draft_vs_measurements(payload: MeasurementComparisonInput) -> Measur
                     trigger_id=f"TRIG-MISS-{draft.key}",
                     severity=Severity.high,
                     title="Measured dimension missing",
-                    standard_ref="IS/Project QA measurement completeness",
+                    standard_ref="NBC 2016 documentation completeness + IS 1200 measurement practice",
                     detail=f"Dimension '{draft.key}' is in draft design but missing in measured set.",
                     recommended_action="Capture missing field measurement and rerun comparison.",
                 )
@@ -253,17 +253,24 @@ def compare_draft_vs_measurements(payload: MeasurementComparisonInput) -> Measur
 
         if not pass_check:
             severity = Severity.critical if abs(deviation) > 2.0 else Severity.high
+            standard_ref = "NBC 2016 + Project QA tolerance control"
+            key_lower = draft.key.lower()
+            if any(token in key_lower for token in ["slab", "beam", "column", "wall", "footing"]):
+                standard_ref = "IS 456 dimensional control + NBC 2016"
+            elif any(token in key_lower for token in ["truss", "steel", "canopy", "frame"]):
+                standard_ref = "IS 800 fabrication tolerance + NBC 2016"
+
             triggers.append(
                 StandardsTrigger(
                     trigger_id=f"TRIG-TOL-{draft.key}",
                     severity=severity,
                     title="Tolerance violation",
-                    standard_ref="ISO 2768 / IS manufacturing tolerance control",
+                    standard_ref=standard_ref,
                     detail=(
                         f"'{draft.key}' measured at {measured.value_mm} mm is outside "
                         f"allowed range [{round(min_allowed, 3)}, {round(max_allowed, 3)}] mm."
                     ),
-                    recommended_action="Adjust fabrication process or revise design tolerance with engineering approval.",
+                    recommended_action="Revise structural detail or site execution tolerance and issue corrected drawing/SOP.",
                 )
             )
 
