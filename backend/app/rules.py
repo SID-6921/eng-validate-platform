@@ -1,6 +1,13 @@
 from typing import List
 
-from .schemas import DesignValidationInput, Severity, ValidationFinding
+from .schemas import (
+    DesignSource,
+    DesignValidationInput,
+    ProcessSuggestionInput,
+    ProcessSuggestionResponse,
+    Severity,
+    ValidationFinding,
+)
 
 
 def run_validation(payload: DesignValidationInput) -> List[ValidationFinding]:
@@ -106,3 +113,97 @@ def compute_readiness_score(findings: List[ValidationFinding]) -> float:
         score -= penalty[finding.severity]
 
     return round(max(score, 0.0), 2)
+
+
+def suggest_manufacturing_process(payload: ProcessSuggestionInput) -> ProcessSuggestionResponse:
+    process = "CNC machining"
+    reasoning: List[str] = []
+    risks: List[str] = []
+
+    volume = payload.annual_volume
+    tol = payload.tolerance_mm
+    min_feature = payload.min_feature_mm
+
+    if payload.process_family == "sheet-metal":
+        process = "Laser cutting + CNC bending"
+        reasoning.append("Sheet-metal family selected with geometry suitable for flat-pattern workflows.")
+    elif payload.process_family == "plastic":
+        process = "Injection molding" if volume >= 10000 else "CNC/3D print prototype + bridge tooling"
+        reasoning.append("Plastic parts with annual volume drive tooling vs prototype tradeoff.")
+    elif payload.process_family == "additive":
+        process = "Industrial additive manufacturing (SLM/SLS)"
+        reasoning.append("Additive family selected for complex geometry and low-to-mid volume builds.")
+    else:
+        if volume >= 5000:
+            process = "CNC machining + dedicated fixtures"
+        elif volume >= 500:
+            process = "CNC machining (cell production)"
+        else:
+            process = "CNC prototype workflow"
+        reasoning.append("Metal family defaults to CNC path with volume-driven production strategy.")
+
+    if tol <= 0.02:
+        reasoning.append("Tight tolerance target indicates precision machining and metrology planning.")
+        risks.append("High precision tolerance may increase cycle time and scrap risk.")
+    elif tol >= 0.5:
+        reasoning.append("Loose tolerance allows higher-throughput manufacturing options.")
+
+    if min_feature < 1.0:
+        risks.append("Very small feature size may need special tooling and process validation.")
+
+    standards = [
+        "ISO 2768 (general tolerances)",
+        "ISO GPS / GD&T references",
+        "ASTM material specification for selected alloy/polymer",
+        "ANSI/ASME Y14.5 for dimensioning and tolerancing",
+        "Internal SOP: process capability and inspection plan",
+    ]
+
+    tolerance_band = "0.01-0.05 mm" if tol <= 0.05 else "0.05-0.20 mm" if tol <= 0.2 else "0.20-0.80 mm"
+
+    if not risks:
+        risks.append("No immediate high-risk flags from quick pre-screen; run full DFM + simulation checks.")
+
+    return ProcessSuggestionResponse(
+        design_name=payload.design_name,
+        recommended_process=process,
+        reasoning=reasoning,
+        suggested_tolerance_band_mm=tolerance_band,
+        standards_to_check=standards,
+        production_risks=risks,
+    )
+
+
+def get_online_design_sources() -> List[DesignSource]:
+    return [
+        DesignSource(
+            name="GrabCAD Library",
+            url="https://grabcad.com/library",
+            category="Community CAD models",
+            notes="Large free community library for concept benchmarking and reference geometry.",
+        ),
+        DesignSource(
+            name="TraceParts",
+            url="https://www.traceparts.com/en",
+            category="Supplier CAD catalogs",
+            notes="Industrial component catalogs across mechanical, electrical, fluid systems.",
+        ),
+        DesignSource(
+            name="3D ContentCentral",
+            url="https://www.3dcontentcentral.com",
+            category="Supplier + user CAD content",
+            notes="2D/3D CAD parts and assemblies with supplier and community contributions.",
+        ),
+        DesignSource(
+            name="McMaster-Carr CAD",
+            url="https://www.mcmaster.com/cad-models/",
+            category="Commercial component CAD",
+            notes="High-coverage mechanical part CAD for fast BOM and assembly design.",
+        ),
+        DesignSource(
+            name="ISO Standards Portal",
+            url="https://www.iso.org/standards.html",
+            category="Standards lookup",
+            notes="Official standards catalog and metadata (full texts may require purchase/access).",
+        ),
+    ]

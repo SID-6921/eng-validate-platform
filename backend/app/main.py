@@ -1,8 +1,19 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .rules import compute_readiness_score, run_validation
-from .schemas import DesignValidationInput, DesignValidationResponse
+from .rules import (
+    compute_readiness_score,
+    get_online_design_sources,
+    run_validation,
+    suggest_manufacturing_process,
+)
+from .schemas import (
+    DesignSource,
+    DesignValidationInput,
+    DesignValidationResponse,
+    ProcessSuggestionInput,
+    ProcessSuggestionResponse,
+)
 
 app = FastAPI(
     title="Engineering Validation Platform API",
@@ -37,6 +48,16 @@ def standards() -> dict:
             "Regional-Code",
         ]
     }
+
+
+@app.get("/api/v1/design-sources", response_model=list[DesignSource])
+def design_sources() -> list[DesignSource]:
+    return get_online_design_sources()
+
+
+@app.post("/api/v1/suggest-process", response_model=ProcessSuggestionResponse)
+def suggest_process(payload: ProcessSuggestionInput) -> ProcessSuggestionResponse:
+    return suggest_manufacturing_process(payload)
 
 
 @app.post("/api/v1/validate-design", response_model=DesignValidationResponse)

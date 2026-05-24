@@ -23,11 +23,43 @@ type ResponsePayload = {
   recommendations: string[];
 };
 
+type ProcessSuggestionResponse = {
+  design_name: string;
+  recommended_process: string;
+  reasoning: string[];
+  suggested_tolerance_band_mm: string;
+  standards_to_check: string[];
+  production_risks: string[];
+};
+
+type DesignSource = {
+  name: string;
+  url: string;
+  category: string;
+  notes: string;
+};
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ResponsePayload | null>(null);
+  const [processLoading, setProcessLoading] = useState(false);
+  const [sourcesLoading, setSourcesLoading] = useState(false);
+  const [processResult, setProcessResult] = useState<ProcessSuggestionResponse | null>(null);
+  const [sources, setSources] = useState<DesignSource[]>([]);
+
+  const [form, setForm] = useState({
+    design_name: "Motor Mount Plate",
+    process_family: "metal",
+    part_length_mm: 220,
+    part_width_mm: 130,
+    part_height_mm: 18,
+    min_feature_mm: 1.2,
+    tolerance_mm: 0.05,
+    annual_volume: 3200,
+    material: "AL-6061",
+  });
 
   const runValidation = async () => {
     setLoading(true);
@@ -59,6 +91,38 @@ export default function HomePage() {
       alert("Could not connect to backend API. Ensure backend is running on port 8000.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const runProcessSuggestion = async () => {
+    setProcessLoading(true);
+    setProcessResult(null);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/suggest-process`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = (await res.json()) as ProcessSuggestionResponse;
+      setProcessResult(data);
+    } catch {
+      alert("Could not connect to process suggestion API.");
+    } finally {
+      setProcessLoading(false);
+    }
+  };
+
+  const loadDesignSources = async () => {
+    setSourcesLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/design-sources`);
+      const data = (await res.json()) as DesignSource[];
+      setSources(data);
+    } catch {
+      alert("Could not load online design sources.");
+    } finally {
+      setSourcesLoading(false);
     }
   };
 
@@ -117,6 +181,59 @@ export default function HomePage() {
           </section>
         </>
       )}
+
+      <section className="panel grid" style={{ gap: 12 }}>
+        <h2>Manufacturing Process Suggestion From Measurements</h2>
+        <p className="small">Enter core dimensions and tolerance to get a standards-aware process recommendation.</p>
+        <div className="grid grid-two">
+          <input value={form.design_name} onChange={(e) => setForm({ ...form, design_name: e.target.value })} placeholder="Design name" />
+          <input value={form.process_family} onChange={(e) => setForm({ ...form, process_family: e.target.value })} placeholder="Process family" />
+          <input type="number" value={form.part_length_mm} onChange={(e) => setForm({ ...form, part_length_mm: Number(e.target.value) })} placeholder="Length (mm)" />
+          <input type="number" value={form.part_width_mm} onChange={(e) => setForm({ ...form, part_width_mm: Number(e.target.value) })} placeholder="Width (mm)" />
+          <input type="number" value={form.part_height_mm} onChange={(e) => setForm({ ...form, part_height_mm: Number(e.target.value) })} placeholder="Height (mm)" />
+          <input type="number" value={form.min_feature_mm} onChange={(e) => setForm({ ...form, min_feature_mm: Number(e.target.value) })} placeholder="Min feature (mm)" />
+          <input type="number" value={form.tolerance_mm} onChange={(e) => setForm({ ...form, tolerance_mm: Number(e.target.value) })} placeholder="Tolerance (mm)" />
+          <input type="number" value={form.annual_volume} onChange={(e) => setForm({ ...form, annual_volume: Number(e.target.value) })} placeholder="Annual volume" />
+          <input value={form.material} onChange={(e) => setForm({ ...form, material: e.target.value })} placeholder="Material" />
+        </div>
+        <button onClick={runProcessSuggestion} disabled={processLoading}>
+          {processLoading ? "Evaluating..." : "Suggest Manufacturing Process"}
+        </button>
+      </section>
+
+      {processResult && (
+        <section className="panel grid" style={{ gap: 8 }}>
+          <h2>Process Recommendation</h2>
+          <p><strong>Recommended process:</strong> {processResult.recommended_process}</p>
+          <p className="small"><strong>Suggested tolerance band:</strong> {processResult.suggested_tolerance_band_mm}</p>
+          <h3>Reasoning</h3>
+          {processResult.reasoning.map((item) => (
+            <p key={item} className="small">- {item}</p>
+          ))}
+          <h3>Standards To Check</h3>
+          {processResult.standards_to_check.map((item) => (
+            <p key={item} className="small">- {item}</p>
+          ))}
+          <h3>Production Risks</h3>
+          {processResult.production_risks.map((item) => (
+            <p key={item} className="small">- {item}</p>
+          ))}
+        </section>
+      )}
+
+      <section className="panel grid" style={{ gap: 8 }}>
+        <h2>Online Design Libraries</h2>
+        <button onClick={loadDesignSources} disabled={sourcesLoading}>
+          {sourcesLoading ? "Loading..." : "Load Online Design Sources"}
+        </button>
+        {sources.map((source) => (
+          <article key={source.name} className="panel" style={{ borderStyle: "dashed" }}>
+            <p><strong>{source.name}</strong> ({source.category})</p>
+            <p className="small">{source.notes}</p>
+            <a href={source.url} target="_blank" rel="noreferrer">{source.url}</a>
+          </article>
+        ))}
+      </section>
     </main>
   );
 }

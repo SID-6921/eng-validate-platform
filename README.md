@@ -45,6 +45,8 @@ npm run dev
 - `GET /health`
 - `POST /api/v1/validate-design`
 - `GET /api/v1/standards`
+- `GET /api/v1/design-sources`
+- `POST /api/v1/suggest-process`
 
 ## Next build milestones
 

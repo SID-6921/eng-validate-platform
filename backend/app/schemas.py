@@ -41,3 +41,34 @@ class DesignValidationResponse(BaseModel):
     status: str
     findings: List[ValidationFinding]
     recommendations: List[str]
+
+
+class ProcessSuggestionInput(BaseModel):
+    design_name: str = Field(..., min_length=2)
+    process_family: str = Field(
+        default="metal",
+        description="metal, plastic, sheet-metal, additive",
+    )
+    part_length_mm: float = Field(..., gt=0)
+    part_width_mm: float = Field(..., gt=0)
+    part_height_mm: float = Field(..., gt=0)
+    min_feature_mm: float = Field(..., gt=0)
+    tolerance_mm: float = Field(..., gt=0)
+    annual_volume: int = Field(..., gt=0)
+    material: str
+
+
+class ProcessSuggestionResponse(BaseModel):
+    design_name: str
+    recommended_process: str
+    reasoning: List[str]
+    suggested_tolerance_band_mm: str
+    standards_to_check: List[str]
+    production_risks: List[str]
+
+
+class DesignSource(BaseModel):
+    name: str
+    url: str
+    category: str
+    notes: str
